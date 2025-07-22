@@ -1,0 +1,13 @@
+# 環境変数ファイル
+.env
+
+# Python仮想環境（フォルダ名が venv or env の場合）
+venv
+env
+
+# Pythonキャッシュ
+__pycache__
+.pyc
+
+# その他エディタ系
+.DS_Store
