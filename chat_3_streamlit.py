@@ -5,12 +5,14 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.schema import HumanMessage
 from langchain.text_splitter import SpacyTextSplitter
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
+from langchain.text_splitter import CharacterTextSplitter
 import os
-load_dotenv()
+# load_dotenv()
 
 # ↓こうすれば読み取れる！
-api_key = os.getenv("OPENAI_API_KEY")
+# api_key = os.getenv("OPENAI_API_KEY")
+api_key = st.secrets["OPENAI_API_KEY"]
 
 # LangChainオブジェクトに渡す
 embeddings = OpenAIEmbeddings(openai_api_key=api_key)
@@ -26,7 +28,8 @@ if uploaded_file:
 
     loader = PyPDFLoader("temp.pdf")
     docs = loader.load()
-    splitter = SpacyTextSplitter(chunk_size=300, pipeline="ja_core_news_sm")
+    splitter = CharacterTextSplitter(chunk_size=1000, separator="\n")
+    # splitter = SpacyTextSplitter(chunk_size=300, pipeline="ja_core_news_sm")
     split_docs = splitter.split_documents(docs)
 
     embeddings = OpenAIEmbeddings()
