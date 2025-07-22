@@ -5,4 +5,5 @@ langchain-openai
 openai
 faiss-cpu
 spacy
+pypdf
 python-dotenv
