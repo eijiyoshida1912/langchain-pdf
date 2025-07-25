@@ -14,6 +14,14 @@ from langchain.prompts import PromptTemplate
 # api_key = os.getenv("OPENAI_API_KEY")
 api_key = st.secrets["OPENAI_API_KEY"]
 
+# 最初のほうに書いておくと安全！
+if "query" not in st.session_state:
+    st.session_state["query"] = ""
+
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = []
+
+
 # LangChainオブジェクトに渡す
 embeddings = OpenAIEmbeddings(openai_api_key=api_key)
 chat = ChatOpenAI(openai_api_key=api_key)
@@ -28,16 +36,26 @@ prompt_template = PromptTemplate(
     template="以下の文章を日本語で要約してください。\n{text}"
 )
 
-
 if uploaded_file:
     # ファイル名（または bytes の hash など）で変化を検知
     file_key = uploaded_file.name  # ←または hash(uploaded_file.read()) を使う手もある
 
+    # chat履歴を初期化（ファイルが変わったらリセットもここで）
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
     # ファイルが前と違うならリセット
     if st.session_state.get("uploaded_file_key") != file_key:
-        st.session_state.clear()  # 必要なキーだけ削除するなら del でもOK
         st.session_state["uploaded_file_key"] = file_key
-        st.session_state["query"] = ""  # ← このキーの値をクリア
+        if "summary" in st.session_state:
+            del st.session_state["summary"]
+        if "split_docs" in st.session_state:
+            del st.session_state["split_docs"]
+        if "db" in st.session_state:
+            del st.session_state["db"]
+        st.session_state["query"] = ""
+        st.session_state["chat_history"] = []
+
 
     if "summary" not in st.session_state:
         # 一時保存
@@ -68,26 +86,36 @@ if uploaded_file:
     st.subheader("📄 PDFの要約")
     st.info(st.session_state["summary"])
 
-    # まだ作ってないときだけ（初回）
-    if "db" not in st.session_state:
-        embeddings = OpenAIEmbeddings(openai_api_key=api_key)
-        db = FAISS.from_documents(split_docs, embeddings)
-        st.session_state["db"] = db
+    # チャットUI（下固定）
+    query = st.chat_input("質問をどうぞ")
 
-    query = st.text_input("質問をどうぞ", key="query")
+
+
     if query:
-        results = st.session_state["db"].similarity_search(query, k=3)
+        db = st.session_state["db"]
+        results = db.similarity_search(query, k=3)
 
         content = "\n".join([d.page_content for d in results])
         prompt = PromptTemplate(template="""
+以下の文章を参考にして、質問に日本語で答えてください。
+
 文章:
 {document}
 
 質問: {query}
 """, input_variables=["document", "query"])
 
-        chat = ChatOpenAI()
+        chat = ChatOpenAI(openai_api_key=api_key)
         response = chat([
             HumanMessage(content=prompt.format(document=content, query=query))
         ])
-        st.write(response.content)
+        # 履歴に追加
+        st.session_state.chat_history.append({
+            "user": query,
+            "bot": response.content
+        })
+
+        for entry in st.session_state.chat_history:
+            st.markdown(f"あなた：** {entry['user']}")
+            st.markdown(f"回答：** {entry['bot']}")
+            st.markdown("---")
