@@ -11,3 +11,6 @@ __pycache__
 
 # その他エディタ系
 .DS_Store
+
+# APIキー
+.streamlit/secrets.toml
