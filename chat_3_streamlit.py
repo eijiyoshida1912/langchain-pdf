@@ -10,8 +10,6 @@ import os
 from langchain.chains.summarize import load_summarize_chain
 from langchain.prompts import PromptTemplate
 
-# ↓こうすれば読み取れる！
-# api_key = os.getenv("OPENAI_API_KEY")
 api_key = st.secrets["OPENAI_API_KEY"]
 
 # 最初のほうに書いておくと安全！
@@ -62,25 +60,34 @@ if uploaded_file:
         with open("temp.pdf", "wb") as f:
             f.write(uploaded_file.read())
 
-        loader = PyPDFLoader("temp.pdf")
-        docs = loader.load()
-
-        splitter = CharacterTextSplitter(chunk_size=1000, separator="\n")
-        split_docs = splitter.split_documents(docs)
-
-        # 要約（日本語）
-        summary_chain = load_summarize_chain(
-            llm=chat,
-            chain_type="map_reduce",
-            map_prompt=prompt_template,
-            combine_prompt=prompt_template
-        )
-        summary = summary_chain.run(split_docs)
+        # ＜NEW: 視覚的にわかる進行パネル＞
+        with st.status("📥 PDFを解析しています…", expanded=True) as status:
+            status.write("PDFを読み込んでいます…")
+            loader = PyPDFLoader("temp.pdf")
+            docs = loader.load()
+    
+            status.write("テキストを分割しています…")
+            splitter = CharacterTextSplitter(chunk_size=1000, separator="\n")
+            split_docs = splitter.split_documents(docs)
+    
+            status.write("要約を生成しています…")
+            summary_chain = load_summarize_chain(
+                llm=chat,
+                chain_type="map_reduce",
+                map_prompt=prompt_template,
+                combine_prompt=prompt_template
+            )
+            summary = summary_chain.run(split_docs)
+    
+            status.update(label="✅ 要約が完了しました", state="complete")
 
         # セッションに保存
         st.session_state["split_docs"] = split_docs
         st.session_state["summary"] = summary
         st.session_state["db"] = FAISS.from_documents(split_docs, embeddings)
+
+        # ＜NEW: 右下ポップアップ通知＞
+        st.toast("PDFの要約が完了しました", icon="✅")
 
     # 表示だけ再利用
     st.subheader("📄 PDFの要約")
