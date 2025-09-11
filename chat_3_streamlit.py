@@ -93,36 +93,58 @@ if uploaded_file:
     st.subheader("📄 PDFの要約")
     st.info(st.session_state["summary"])
 
-    # チャットUI（下固定）
+
+    # --- チャット履歴の管理（role: "user" / "assistant"） ---
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = []
+    
+    # 既存履歴を先に描画（←これがあるから即時に見える）
+    for m in st.session_state["messages"]:
+        st.chat_message(m["role"]).markdown(m["content"])
+    
+    # 入力欄
     query = st.chat_input("質問をどうぞ")
 
 
-
+    # 送信後の処理
     if query:
-        db = st.session_state["db"]
-        results = db.similarity_search(query, k=3)
-
-        content = "\n".join([d.page_content for d in results])
-        prompt = PromptTemplate(template="""
-以下の文章を参考にして、質問に日本語で答えてください。
-
-文章:
-{document}
-
-質問: {query}
-""", input_variables=["document", "query"])
-
-        chat = ChatOpenAI(openai_api_key=api_key)
-        response = chat([
-            HumanMessage(content=prompt.format(document=content, query=query))
-        ])
-        # 履歴に追加
-        st.session_state.chat_history.append({
-            "user": query,
-            "bot": response.content
-        })
-
-        for entry in st.session_state.chat_history:
-            st.markdown(f"あなた：** {entry['user']}")
-            st.markdown(f"回答：** {entry['bot']}")
-            st.markdown("---")
+        # 1) ユーザー発言は即表示
+        st.session_state["messages"].append({"role": "user", "content": query})
+        st.chat_message("user").markdown(query)
+    
+        # 2) アシスタントの枠だけ先に用意
+        assistant_box = st.chat_message("assistant")
+    
+        # 3) ステータスを入れるプレースホルダ
+        ph = st.empty()
+        with ph.container():
+            with st.status("🔎 回答を生成中…", expanded=True) as status:
+                status.write("関連箇所を検索しています…")
+                db = st.session_state["db"]
+                results = db.similarity_search(query, k=3)
+    
+                content = "\n".join([d.page_content for d in results])
+                prompt = PromptTemplate(
+                    template="""
+    以下の文章を参考にして、質問に日本語で答えてください。
+    
+    文章:
+    {document}
+    
+    質問: {query}
+    """,
+                    input_variables=["document", "query"]
+                )
+    
+                status.write("回答を作成しています…")
+                chat = ChatOpenAI(openai_api_key=api_key)
+                response = chat([HumanMessage(content=prompt.format(document=content, query=query))])
+    
+                status.update(label="✅ 回答ができました", state="complete", expanded=False)
+    
+        # 4) ステータスを消す
+        ph.empty()
+    
+        # 5) 回答描画＆履歴保存
+        assistant_box.markdown(response.content)
+        st.session_state["messages"].append({"role": "assistant", "content": response.content})
