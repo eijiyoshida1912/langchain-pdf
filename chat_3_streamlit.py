@@ -24,7 +24,7 @@ if "chat_history" not in st.session_state:
 embeddings = OpenAIEmbeddings(openai_api_key=api_key)
 chat = ChatOpenAI(openai_api_key=api_key)
 
-st.title("PDF QA チャット")
+st.title("PDFｙ読み込み君")
 
 uploaded_file = st.file_uploader("PDFをアップロード", type=["pdf"])
 
